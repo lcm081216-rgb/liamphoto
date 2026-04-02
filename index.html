@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>李宸铭摄影</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+	<link rel="stylesheet" href="css/main.css">
+</head>
+<body class="is-loading-0 is-loading-1 is-loading-2">
+
+	<!-- Main -->
+	<div id="main">
+		<header id="header">
+			<h1>李宸铭</h1>
+			<h2>摄影作品</h2>
+			<p>热爱摄影的高中生，喜欢捕捉光影的瞬间</p>
+			<ul class="icons">
+				<li><a href="https://github.com/lcm081216-rgb" class="icon fa-github"><span class="label">Github</span></a></li>
+				<li><a href="mailto:180578790@qq.com" class="icon fa-envelope-o"><span class="label">Email</span></a></li>
+			</ul>
+		</header>
+
+		<section id="thumbnails">
+			<div style="padding: 2em; text-align: center; color: #666;">加载中...</div>
+		</section>
+
+		<footer id="footer">
+			<ul class="copyright">
+				<li>Copyright &copy; 2017 - Elastic Designs.</li>
+				<li>Powered by <a href="https://pages.cloudflare.com">Cloudflare Pages</a></li>
+			</ul>
+		</footer>
+	</div>
+
+	<!-- Viewer -->
+	<div id="viewer"></div>
+
+	<script>
+	(function() {
+		'use strict';
+
+		// Configuration - change these for your deployment
+		// For local testing, use GitHub raw URLs
+		// For production, use relative paths like 'gallery/xxx.jpg'
+		var USE_GITHUB = false; // Set to false when deploying with local gallery folder
+		var GITHUB_REPO = 'lcm081216-rgb/photo-portfolio';
+		var GITHUB_BRANCH = 'master';
+		var GITHUB_API = 'https://api.github.com/repos/' + GITHUB_REPO + '/contents/gallery';
+		var RAW_BASE = 'https://raw.githubusercontent.com/' + GITHUB_REPO + '/' + GITHUB_BRANCH + '/gallery/';
+
+			// Fallback: hardcoded list from your gallery (used when gallery.json doesn't exist)
+		var FALLBACK_PHOTOS = [
+			{name: 'Peace.jpeg', title: 'Peace'},
+			{name: '兴安不冻河.jpeg', title: '兴安不冻河'},
+			{name: '孤枝.jpeg', title: '孤枝'},
+			{name: '山间瀑布.jpeg', title: '山间瀑布'},
+			{name: '崖壁水流.jpeg', title: '崖壁水流'},
+			{name: '急雨.jpeg', title: '急雨'},
+			{name: '旧船与海.jpeg', title: '旧船与海'},
+			{name: '春枝.jpeg', title: '春枝'},
+			{name: '春蜂.jpeg', title: '春蜂'},
+			{name: '林间萤火.jpeg', title: '林间萤火'},
+			{name: '林间路.jpeg', title: '林间路'},
+			{name: '樱云.jpeg', title: '樱云'},
+			{name: '水面飞鸟.jpeg', title: '水面飞鸟'},
+			{name: '海面船只.jpeg', title: '海面船只'},
+			{name: '砖缝.jpeg', title: '砖缝'},
+			{name: '窗与星空.jpeg', title: '窗与星空'},
+			{name: '紫峰.jpeg', title: '紫峰'},
+			{name: '细界.jpeg', title: '细界'},
+			{name: '草原与马.jpeg', title: '草原与马'},
+			{name: '荷尖.jpeg', title: '荷尖'},
+			{name: '莫日格勒.jpeg', title: '莫日格勒'},
+			{name: '触.jpeg', title: '触'},
+			{name: '雪山.jpeg', title: '雪山'},
+			{name: '骆驼.jpeg', title: '骆驼'}
+		];
+
+		// State
+		var slides = [];
+		var current = null;
+		var locked = false;
+		var isFullscreen = false;
+
+		// Elements
+		var body = document.body;
+		var main = document.getElementById('main');
+		var thumbnails = document.getElementById('thumbnails');
+		var viewer = document.getElementById('viewer');
+
+		// Initialize viewer structure
+		viewer.innerHTML = 
+			'<div class="inner">' +
+				'<div class="nav-next"></div>' +
+				'<div class="nav-previous"></div>' +
+				'<div class="toggle"></div>' +
+			'</div>';
+
+		var viewerInner = viewer.querySelector('.inner');
+		var navNext = viewerInner.querySelector('.nav-next');
+		var navPrev = viewerInner.querySelector('.nav-previous');
+		var viewerToggle = viewerInner.querySelector('.toggle');
+
+		// Add main toggle
+		var mainToggle = document.createElement('div');
+		mainToggle.className = 'toggle';
+		main.insertBefore(mainToggle, main.firstChild);
+
+		// Breakpoints
+		function isXSmall() { return window.innerWidth <= 480; }
+		function isSmall() { return window.innerWidth <= 736; }
+		function isMedium() { return window.innerWidth <= 980; }
+		function isLarge() { return window.innerWidth <= 1280; }
+
+		// Get image URL
+		function getImageUrl(name) {
+			return USE_GITHUB ? RAW_BASE + encodeURIComponent(name) : 'gallery/' + name;
+		}
+
+		// Build gallery
+		function buildGallery(photos) {
+			thumbnails.innerHTML = '';
+
+			photos.forEach(function(photo, index) {
+				var title = photo.title || photo.name.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+				var article = document.createElement('article');
+				article.innerHTML = 
+					'<a class="thumbnail" href="' + getImageUrl(photo.name) + '" data-index="' + index + '">' +
+						'<img src="' + getImageUrl(photo.name) + '" alt="' + title + '" loading="lazy">' +
+					'</a>' +
+					'<h2>' + title + '</h2>';
+				article.querySelector('.thumbnail').addEventListener('click', function(e) {
+					e.preventDefault();
+					switchTo(index);
+				});
+				thumbnails.appendChild(article);
+
+				slides.push({
+					url: getImageUrl(photo.name),
+					title: title,
+					loaded: false
+				});
+			});
+
+			// Auto-show first photo on desktop (not on mobile portrait)
+			if (!isXSmall() && slides.length > 0) {
+				switchTo(0, true);
+			}
+		}
+
+		// Load gallery
+		function loadGallery() {
+			if (USE_GITHUB) {
+				// Use hardcoded list with GitHub raw URLs (for cross-repo setup)
+				buildGallery(FALLBACK_PHOTOS);
+			} else {
+				// Try to load gallery.json first (auto-generated by GitHub Actions)
+				fetch('gallery.json')
+					.then(function(response) {
+						if (!response.ok) throw new Error('gallery.json not found');
+						return response.json();
+					})
+					.then(function(photos) {
+						if (Array.isArray(photos) && photos.length > 0) {
+							buildGallery(photos);
+						} else {
+							buildGallery(FALLBACK_PHOTOS);
+						}
+					})
+					.catch(function() {
+						// gallery.json not found, try GitHub API as fallback
+						fetch(GITHUB_API, { headers: { 'Accept': 'application/vnd.github.v3+json' } })
+							.then(function(response) {
+								if (!response.ok) throw new Error('API error');
+								return response.json();
+							})
+							.then(function(files) {
+								if (!Array.isArray(files) || files.length === 0) {
+									buildGallery(FALLBACK_PHOTOS);
+									return;
+								}
+								var photos = files
+									.filter(function(file) {
+										var ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+										return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].indexOf(ext) !== -1;
+									})
+									.map(function(file) {
+										return { name: file.name };
+									})
+									.sort(function(a, b) {
+										return a.name.localeCompare(b.name, 'zh-CN');
+									});
+							buildGallery(photos.length > 0 ? photos : FALLBACK_PHOTOS);
+							})
+							.catch(function() {
+								buildGallery(FALLBACK_PHOTOS);
+							});
+					});
+			}
+		}
+
+		// Switch to slide
+		function switchTo(index, noHide) {
+			if (current === index && !isXSmall()) return;
+			if (locked) return;
+			locked = true;
+
+			if (!noHide && isMedium() && !isXSmall()) {
+				hide();
+			}
+
+			var oldSlide = current !== null ? slides[current] : null;
+			var newSlide = slides[index];
+
+			// Deactivate old
+			if (oldSlide) {
+				var oldThumb = thumbnails.querySelector('article.active');
+				if (oldThumb) oldThumb.classList.remove('active');
+			}
+
+			current = index;
+
+			// Create or get slide element
+			var slideEl = viewer.querySelector('.slide[data-index="' + index + '"]');
+			if (!slideEl) {
+				slideEl = document.createElement('div');
+				slideEl.className = 'slide loading';
+				slideEl.dataset.index = index;
+				slideEl.innerHTML = 
+					'<div class="caption"><h2>' + newSlide.title + '</h2></div>' +
+					'<div class="image"></div>';
+				viewer.appendChild(slideEl);
+
+				// Preload
+				var img = new Image();
+				img.onload = function() {
+					slideEl.querySelector('.image').style.backgroundImage = 'url(' + newSlide.url + ')';
+					slideEl.classList.remove('loading');
+					slideEl.classList.add('active');
+					newSlide.loaded = true;
+				};
+				img.src = newSlide.url;
+			}
+
+			// Activate thumbnail
+			var newThumb = thumbnails.querySelector('article:nth-child(' + (index + 1) + ')');
+			if (newThumb) {
+				newThumb.classList.add('active');
+			}
+
+			setTimeout(function() {
+				slideEl.classList.add('active');
+				locked = false;
+			}, oldSlide ? 500 : 100);
+		}
+
+		// Navigation
+		function next() {
+			if (current === null || slides.length === 0) return;
+			var i = current >= slides.length - 1 ? 0 : current + 1;
+			switchTo(i);
+		}
+
+		function previous() {
+			if (current === null || slides.length === 0) return;
+			var i = current <= 0 ? slides.length - 1 : current - 1;
+			switchTo(i);
+		}
+
+		function show() {
+			isFullscreen = false;
+			body.classList.remove('fullscreen');
+			if (!isXSmall()) main.focus();
+		}
+
+		function hide() {
+			if (isXSmall()) {
+				// On portrait mobile, just show viewer without hiding sidebar
+				isFullscreen = false;
+				body.classList.remove('fullscreen');
+			} else {
+				isFullscreen = true;
+				body.classList.add('fullscreen');
+			}
+		}
+
+		function toggle() {
+			if (isFullscreen) show();
+			else hide();
+		}
+
+		// Events
+		mainToggle.addEventListener('click', toggle);
+		viewerToggle.addEventListener('click', toggle);
+		navNext.addEventListener('click', next);
+		navPrev.addEventListener('click', previous);
+
+		document.addEventListener('keydown', function(e) {
+			if (isXSmall()) return;
+			switch (e.keyCode) {
+				case 27: toggle(); break;
+				case 32: case 39: next(); break;
+				case 37: previous(); break;
+			}
+		});
+
+		// Touch
+		var touchStartX = null, touchStartY = null;
+		viewer.addEventListener('touchstart', function(e) {
+			touchStartX = e.touches[0].pageX;
+			touchStartY = e.touches[0].pageY;
+		}, { passive: true });
+
+		viewer.addEventListener('touchend', function(e) {
+			if (touchStartX === null) return;
+			var diffX = touchStartX - e.changedTouches[0].pageX;
+			var diffY = touchStartY - e.changedTouches[0].pageY;
+			if (Math.abs(diffY) < 20 && diffX > 50) next();
+			else if (Math.abs(diffY) < 20 && diffX < -50) previous();
+			touchStartX = null;
+			touchStartY = null;
+		}, { passive: true });
+
+		var mainTouchStartX = null, mainTouchStartY = null;
+		main.addEventListener('touchstart', function(e) {
+			if (isXSmall()) return;
+			mainTouchStartX = e.touches[0].pageX;
+			mainTouchStartY = e.touches[0].pageY;
+		}, { passive: true });
+
+		main.addEventListener('touchend', function(e) {
+			if (mainTouchStartX === null || isXSmall()) return;
+			var diffX = mainTouchStartX - e.changedTouches[0].pageX;
+			var diffY = mainTouchStartY - e.changedTouches[0].pageY;
+			if (Math.abs(diffY) < 20 && diffX > 50) hide();
+			mainTouchStartX = null;
+			mainTouchStartY = null;
+		}, { passive: true });
+
+		// Remove loading classes
+		window.addEventListener('load', function() {
+			setTimeout(function() { body.classList.remove('is-loading-0'); }, 100);
+			setTimeout(function() { body.classList.remove('is-loading-1'); }, 100);
+			setTimeout(function() { body.classList.remove('is-loading-2'); }, 250);
+		});
+
+		// Init
+		loadGallery();
+
+	})();
+	</script>
+</body>
+</html>
